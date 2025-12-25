@@ -120,3 +120,14 @@ button:disabled {
 .recording #panel {
   opacity: 0.25;
 }
+.recording #panel {
+  display: none !important;
+}
+
+.recording textarea {
+  display: none !important;
+}
+
+.recording .controls {
+  display: none !important;
+}
