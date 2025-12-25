@@ -171,7 +171,7 @@ window.onbeforeunload = () => {
   }
   if (mediaStream) {
     mediaStream.getTracks().forEach(t => t.stop());
-  }
+  
 };
-document.body.classList.add("recording");
-document.body.classList.remove("recording");
+
+
