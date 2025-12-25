@@ -27,11 +27,40 @@ startCamBtn.onclick = async () => {
       facingMode: "user"
     },
     audio: true
+    // GAIN
+const gain = audioContext.createGain();
+gain.gain.value = parseFloat(gainKnob.value);
+
+// SSL COMP
+const compressor = audioContext.createDynamicsCompressor();
+compressor.threshold.value = -18;
+compressor.knee.value = 12;
+compressor.ratio.value = parseFloat(compKnob.value);
+compressor.attack.value = 0.003;
+compressor.release.value = 0.25;
+
+// MAAG AIR (high shelf)
+const air = audioContext.createBiquadFilter();
+air.type = "highshelf";
+air.frequency.value = 12000;
+air.gain.value = parseFloat(airKnob.value);
+
+// LIMITER
+const limiter = audioContext.createDynamicsCompressor();
+limiter.threshold.value = parseFloat(limitKnob.value);
+limiter.knee.value = 0;
+limiter.ratio.value = 20;
+limiter.attack.value = 0.001;
+limiter.release.value = 0.05;
+
   });
 
   // AUDIO CONTEXT
-  const audioContext = new AudioContext();
-  const source = audioContext.createMediaStreamSource(mediaStream);
+ const gainKnob = document.getElementById("gainKnob");
+const compKnob = document.getElementById("compKnob");
+const airKnob  = document.getElementById("airKnob");
+const limitKnob = document.getElementById("limitKnob");
+
 
   // GAIN
   const gain = audioContext.createGain();
