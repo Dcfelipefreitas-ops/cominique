@@ -1,0 +1,103 @@
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+#teleprompter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#text {
+  position: absolute;
+  top: 100%;
+  width: 80%;
+  font-size: 42px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.6;
+  text-shadow: 3px 3px 8px #000;
+}
+
+#rec-indicator {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  color: red;
+  border: 1px solid red;
+  padding: 6px 10px;
+  font-family: monospace;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  background: red;
+  border-radius: 50%;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+#panel {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+}
+
+textarea {
+  flex: 1;
+  background: #222;
+  color: #fff;
+  border: none;
+  padding: 10px;
+}
+
+.controls {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+button {
+  padding: 10px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.recording #panel {
+  display: none;
+}
+
+.recording #rec-indicator {
+  display: flex;
+}
