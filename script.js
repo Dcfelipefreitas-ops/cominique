@@ -1,177 +1,70 @@
 const video = document.getElementById("video");
-const startCamBtn = document.getElementById("startCam");
+const text = document.getElementById("text");
+const script = document.getElementById("script");
+const speed = document.getElementById("speed");
 const recordBtn = document.getElementById("record");
 const stopBtn = document.getElementById("stop");
-const scriptInput = document.getElementById("script");
-const text = document.getElementById("text");
+const download = document.getElementById("download");
+const filename = document.getElementById("filename");
 
-let mediaStream;
 let mediaRecorder;
-let recordedChunks = [];
-let scrollInterval;
-let scrollPos = 100;
+let chunks = [];
+let scrollY = 100;
+let scrollTimer;
 
-// TEXTO
- 
-  color: #f5f5f5;               /* branco TV */
-  font-family: "Helvetica Neue", Arial, sans-serif;
-  font-weight: 600;
-  text-align: center;
-  line-height: 1.5;
-
-  text-shadow:
-    0 2px 6px rgba(0,0,0,0.8),
-    0 0 2px rgba(0,0,0,0.6);
-
+// TEXTO AO VIVO
+script.oninput = () => {
+  text.innerText = script.value || "Paste your script here";
+  scrollY = 100;
+  text.style.top = "100%";
 };
 
-// CAMERA + AUDIO ENGINE
-startCamBtn.onclick = async () => {
-  mediaStream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      facingMode: "user"
-    },
+// INICIAR CÂMERA (FONTE DO PROBLEMA RESOLVIDA AQUI)
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: true,
     audio: true
-    // GAIN
-const gain = audioContext.createGain();
-gain.gain.value = parseFloat(gainKnob.value);
-
-// SSL COMP
-const compressor = audioContext.createDynamicsCompressor();
-compressor.threshold.value = -18;
-compressor.knee.value = 12;
-compressor.ratio.value = parseFloat(compKnob.value);
-compressor.attack.value = 0.003;
-compressor.release.value = 0.25;
-
-// MAAG AIR (high shelf)
-const air = audioContext.createBiquadFilter();
-air.type = "highshelf";
-air.frequency.value = 12000;
-air.gain.value = parseFloat(airKnob.value);
-
-// LIMITER
-const limiter = audioContext.createDynamicsCompressor();
-limiter.threshold.value = parseFloat(limitKnob.value);
-limiter.knee.value = 0;
-limiter.ratio.value = 20;
-limiter.attack.value = 0.001;
-limiter.release.value = 0.05;
-
   });
 
-  // AUDIO CONTEXT
- const gainKnob = document.getElementById("gainKnob");
-const compKnob = document.getElementById("compKnob");
-const airKnob  = document.getElementById("airKnob");
-const limitKnob = document.getElementById("limitKnob");
+  video.srcObject = stream;
+  return stream;
+}
 
+recordBtn.onclick = async () => {
+  const stream = await startCamera();
 
-  // GAIN
-  const gain = audioContext.createGain();
-  gain.gain.value = 1.4;
+  mediaRecorder = new MediaRecorder(stream);
+  chunks = [];
 
-  // COMPRESSOR (voz)
-  const compressor = audioContext.createDynamicsCompressor();
-  compressor.threshold.value = -14;
-  compressor.knee.value = 18;
-  compressor.ratio.value = 4;
-  compressor.attack.value = 0.003;
-  compressor.release.value = 0.25;
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
 
-  // LIMITER (hard)
-  const limiter = audioContext.createDynamicsCompressor();
-  limiter.threshold.value = -3;
-  limiter.knee.value = 0;
-  limiter.ratio.value = 20;
-  limiter.attack.value = 0.001;
-  limiter.release.value = 0.05;
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const url = URL.createObjectURL(blob);
 
-  // DESTINO SILENCIOSO (SEM ECO)
-  const silent = audioContext.createMediaStreamDestination();
-
-  source
-    .connect(gain)
-    .connect(compressor)
-    .connect(limiter)
-    .connect(silent);
-
-  // SUBSTITUI TRACK DE ÁUDIO
-  const tracks = [
-    ...mediaStream.getVideoTracks(),
-    ...silent.stream.getAudioTracks()
-  ];
-
-  mediaStream = new MediaStream(tracks);
-
-  video.srcObject = mediaStream;
-};
-
-// RECORD
-recordBtn.onclick = () => {
-  if (!mediaStream) return alert("Start camera first");
-
-  recordedChunks = [];
-
-  mediaRecorder = new MediaRecorder(mediaStream, {
-    mimeType: "video/webm;codecs=vp9,opus",
-    videoBitsPerSecond: 8000000
-  });
-
-  mediaRecorder.ondataavailable = e => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
+    download.href = url;
+    download.download = (filename.value || "teleprompter") + ".webm";
+    download.style.display = "block";
   };
 
-recorder.onstop = () => {
-  const blob = new Blob(chunks, { type: "video/webm" });
-  const url = URL.createObjectURL(blob);
+  mediaRecorder.start();
 
-  const name = filename.value || "teleprompter-video";
+  document.body.classList.add("recording");
+  recordBtn.disabled = true;
+  stopBtn.disabled = false;
 
-  download.href = url;
-  download.download = name + ".webm";
-  download.style.display = "block";
-
-  chunks = [];
+  // SCROLL SUAVE (A)
+  scrollTimer = setInterval(() => {
+    scrollY -= speed.value * 0.1;
+    text.style.top = scrollY + "%";
+  }, 30);
 };
 
-
-// STOP
 stopBtn.onclick = () => {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
-  }
+  mediaRecorder.stop();
+  clearInterval(scrollTimer);
 
-  clearInterval(scrollInterval);
   document.body.classList.remove("recording");
-
   recordBtn.disabled = false;
   stopBtn.disabled = true;
 };
-
-// SAVE
-function saveVideo() {
-  const blob = new Blob(recordedChunks, { type: "video/webm" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "teleprompter_pro_recording.webm";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-// SAFETY
-window.onbeforeunload = () => {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
-  }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(t => t.stop());
-  
-};
-
-
