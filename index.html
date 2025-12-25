@@ -1,57 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Teleprompter Video App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <video id="video" autoplay muted playsinline></video>
+  <div id="stage">
 
-  <div id="prompter">
-    <div id="text">Paste your script below</div>
+    <video id="video" autoplay muted playsinline></video>
+
+    <div id="prompter">
+      <div id="text">Paste your script here</div>
+    </div>
+
   </div>
 
   <div id="panel">
-    <div class="controls">
 
-  <label>INPUT GAIN
-    <input type="range" id="gainKnob" min="0.5" max="2" step="0.01" value="1.2">
-  </label>
-
-  <label>COMP (SSL)
-    <input type="range" id="compKnob" min="1" max="8" step="0.1" value="4">
-  </label>
-
-  <label>AIR (MAAG)
-    <input type="range" id="airKnob" min="0" max="8" step="0.1" value="2">
-  </label>
-
-  <label>LIMITER
-    <input type="range" id="limitKnob" min="-10" max="-1" step="0.5" value="-3">
-  </label>
-
-  <button id="record">RECORD</button>
-  <button id="stop" disabled>STOP</button>
-
-</div>
-
-    <textarea id="script" placeholder="Paste your script here..."></textarea>
+    <textarea id="script" placeholder="Paste your text here"></textarea>
 
     <div class="controls">
-      <button id="startCam">Start Camera</button>
-      <button id="record">Record</button>
-      <button id="stop" disabled>Stop</button>
+      <label>Speed
+        <input type="range" id="speed" min="0.5" max="5" step="0.1" value="1.5">
+      </label>
+
+      <input id="filename" placeholder="file-name">
+
+      <button id="record">RECORD</button>
+      <button id="stop" disabled>STOP</button>
+
+      <a id="download" style="display:none">DOWNLOAD</a>
     </div>
-  </div>
 
-  <div id="rec">
-    <div class="dot"></div> REC
   </div>
 
   <script src="script.js"></script>
 </body>
 </html>
-<input id="filename" placeholder="nome-do-video" />
