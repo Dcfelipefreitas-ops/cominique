@@ -15,6 +15,29 @@
   </div>
 
   <div id="panel">
+    <div class="controls">
+
+  <label>INPUT GAIN
+    <input type="range" id="gainKnob" min="0.5" max="2" step="0.01" value="1.2">
+  </label>
+
+  <label>COMP (SSL)
+    <input type="range" id="compKnob" min="1" max="8" step="0.1" value="4">
+  </label>
+
+  <label>AIR (MAAG)
+    <input type="range" id="airKnob" min="0" max="8" step="0.1" value="2">
+  </label>
+
+  <label>LIMITER
+    <input type="range" id="limitKnob" min="-10" max="-1" step="0.5" value="-3">
+  </label>
+
+  <button id="record">RECORD</button>
+  <button id="stop" disabled>STOP</button>
+
+</div>
+
     <textarea id="script" placeholder="Paste your script here..."></textarea>
 
     <div class="controls">
