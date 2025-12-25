@@ -12,7 +12,7 @@ let scrollInterval;
 let scrollPos = 100;
 
 // TEXTO
-#text {
+ 
   color: #f5f5f5;               /* branco TV */
   font-family: "Helvetica Neue", Arial, sans-serif;
   font-weight: 600;
@@ -124,19 +124,19 @@ recordBtn.onclick = () => {
     if (e.data.size > 0) recordedChunks.push(e.data);
   };
 
-  mediaRecorder.onstop = saveVideo;
+recorder.onstop = () => {
+  const blob = new Blob(chunks, { type: "video/webm" });
+  const url = URL.createObjectURL(blob);
 
-  mediaRecorder.start();
-  document.body.classList.add("recording");
+  const name = filename.value || "teleprompter-video";
 
-  recordBtn.disabled = true;
-  stopBtn.disabled = false;
+  download.href = url;
+  download.download = name + ".webm";
+  download.style.display = "block";
 
-  scrollInterval = setInterval(() => {
-    scrollPos -= 0.12;
-    text.style.top = scrollPos + "%";
-  }, 30);
+  chunks = [];
 };
+
 
 // STOP
 stopBtn.onclick = () => {
