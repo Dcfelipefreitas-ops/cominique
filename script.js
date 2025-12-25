@@ -11,6 +11,9 @@ let mediaRecorder;
 let chunks = [];
 let scrollY = 100;
 let scrollTimer;
+let stream;
+let mediaRecorder;
+let audioCtx;
 
 // TEXTO AO VIVO
 script.oninput = () => {
@@ -21,9 +24,23 @@ script.oninput = () => {
 
 // INICIAR CÂMERA (FONTE DO PROBLEMA RESOLVIDA AQUI)
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
+  if (stream) return stream;
+
+  stream = await navigator.mediaDevices.getUserMedia({
     video: true,
     audio: true
+  });
+
+  video.srcObject = stream;
+
+  audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") {
+    await audioCtx.resume();
+  }
+
+  return stream;
+}
+
   });
 
   video.srcObject = stream;
@@ -31,12 +48,17 @@ async function startCamera() {
 }
 
 recordBtn.onclick = async () => {
-  const stream = await startCamera();
+  await startCamera();
 
-  mediaRecorder = new MediaRecorder(stream);
   chunks = [];
 
-  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder = new MediaRecorder(stream, {
+    mimeType: "video/webm"
+  });
+
+  mediaRecorder.ondataavailable = e => {
+    if (e.data.size > 0) chunks.push(e.data);
+  };
 
   mediaRecorder.onstop = () => {
     const blob = new Blob(chunks, { type: "video/webm" });
@@ -46,6 +68,19 @@ recordBtn.onclick = async () => {
     download.download = (filename.value || "teleprompter") + ".webm";
     download.style.display = "block";
   };
+
+  mediaRecorder.start(); // ← ISSO ESTAVA FALHANDO ANTES
+
+  document.body.classList.add("recording");
+  recordBtn.disabled = true;
+  stopBtn.disabled = false;
+
+  scrollTimer = setInterval(() => {
+    scrollY -= speed.value * 0.1;
+    text.style.top = scrollY + "%";
+  }, 30);
+};
+
 
   mediaRecorder.start();
 
