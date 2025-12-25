@@ -11,14 +11,14 @@ let recordedChunks = [];
 let scrollInterval;
 let scrollPos = 100;
 
-// TELEPROMPTER TEXT
+// TEXTO
 scriptInput.oninput = () => {
-  text.innerText = scriptInput.value || "Paste your script below";
+  text.innerText = scriptInput.value || "Paste your script here";
   scrollPos = 100;
   text.style.top = "100%";
 };
 
-// CAMERA + AUDIO PRO
+// CAMERA + AUDIO ENGINE
 startCamBtn.onclick = async () => {
   mediaStream = await navigator.mediaDevices.getUserMedia({
     video: {
@@ -29,21 +29,46 @@ startCamBtn.onclick = async () => {
     audio: true
   });
 
-  // AUDIO CHAIN (GAIN + LIMITER)
+  // AUDIO CONTEXT
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(mediaStream);
 
-  const gainNode = audioContext.createGain();
-  gainNode.gain.value = 1.3;
+  // GAIN
+  const gain = audioContext.createGain();
+  gain.gain.value = 1.4;
 
+  // COMPRESSOR (voz)
   const compressor = audioContext.createDynamicsCompressor();
-  compressor.threshold.value = -12;
-  compressor.knee.value = 20;
-  compressor.ratio.value = 6;
+  compressor.threshold.value = -14;
+  compressor.knee.value = 18;
+  compressor.ratio.value = 4;
   compressor.attack.value = 0.003;
   compressor.release.value = 0.25;
 
-  source.connect(gainNode).connect(compressor).connect(audioContext.destination);
+  // LIMITER (hard)
+  const limiter = audioContext.createDynamicsCompressor();
+  limiter.threshold.value = -3;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.05;
+
+  // DESTINO SILENCIOSO (SEM ECO)
+  const silent = audioContext.createMediaStreamDestination();
+
+  source
+    .connect(gain)
+    .connect(compressor)
+    .connect(limiter)
+    .connect(silent);
+
+  // SUBSTITUI TRACK DE ÁUDIO
+  const tracks = [
+    ...mediaStream.getVideoTracks(),
+    ...silent.stream.getAudioTracks()
+  ];
+
+  mediaStream = new MediaStream(tracks);
 
   video.srcObject = mediaStream;
 };
@@ -55,7 +80,8 @@ recordBtn.onclick = () => {
   recordedChunks = [];
 
   mediaRecorder = new MediaRecorder(mediaStream, {
-    mimeType: "video/webm; codecs=vp9"
+    mimeType: "video/webm;codecs=vp9,opus",
+    videoBitsPerSecond: 8000000
   });
 
   mediaRecorder.ondataavailable = e => {
@@ -76,7 +102,7 @@ recordBtn.onclick = () => {
   }, 30);
 };
 
-// STOP — AGORA É DEFINITIVO
+// STOP
 stopBtn.onclick = () => {
   if (mediaRecorder && mediaRecorder.state === "recording") {
     mediaRecorder.stop();
@@ -89,14 +115,14 @@ stopBtn.onclick = () => {
   stopBtn.disabled = true;
 };
 
-// SAVE VIDEO
+// SAVE
 function saveVideo() {
   const blob = new Blob(recordedChunks, { type: "video/webm" });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "teleprompter_recording.webm";
+  a.download = "teleprompter_pro_recording.webm";
   document.body.appendChild(a);
   a.click();
   a.remove();
