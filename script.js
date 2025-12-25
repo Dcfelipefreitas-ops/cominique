@@ -12,10 +12,17 @@ let scrollInterval;
 let scrollPos = 100;
 
 // TEXTO
-scriptInput.oninput = () => {
-  text.innerText = scriptInput.value || "Paste your script here";
-  scrollPos = 100;
-  text.style.top = "100%";
+#text {
+  color: #f5f5f5;               /* branco TV */
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.5;
+
+  text-shadow:
+    0 2px 6px rgba(0,0,0,0.8),
+    0 0 2px rgba(0,0,0,0.6);
+
 };
 
 // CAMERA + AUDIO ENGINE
@@ -166,3 +173,5 @@ window.onbeforeunload = () => {
     mediaStream.getTracks().forEach(t => t.stop());
   }
 };
+document.body.classList.add("recording");
+document.body.classList.remove("recording");
