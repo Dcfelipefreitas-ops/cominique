@@ -40,16 +40,21 @@ scriptInput.oninput = () => {
 async function startCamera() {
   if (stream) return stream;
 
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true
-  });
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
 
-  video.srcObject = stream;
-  video.muted = true; // evita eco
-  video.play();
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
 
-  return stream;
+    return stream;
+  } catch (err) {
+    alert("Erro ao acessar câmera/microfone");
+    console.error(err);
+  }
 }
 
 // ===============================
@@ -57,12 +62,25 @@ async function startCamera() {
 // ===============================
 recordBtn.onclick = async () => {
   await startCamera();
+  if (!stream) return;
 
   chunks = [];
 
-  mediaRecorder = new MediaRecorder(stream, {
-    mimeType: "video/webm;codecs=vp8,opus"
-  });
+  // ✅ MIME TYPE COMPATÍVEL
+  let options = {};
+  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
+    options.mimeType = "video/webm;codecs=vp8,opus";
+  } else if (MediaRecorder.isTypeSupported("video/webm")) {
+    options.mimeType = "video/webm";
+  }
+
+  try {
+    mediaRecorder = new MediaRecorder(stream, options);
+  } catch (e) {
+    alert("MediaRecorder não suportado neste navegador");
+    console.error(e);
+    return;
+  }
 
   mediaRecorder.ondataavailable = e => {
     if (e.data && e.data.size > 0) {
@@ -77,16 +95,14 @@ recordBtn.onclick = async () => {
     download.innerText = "⏳ Convertendo para MP4...";
     download.removeAttribute("download");
 
-    // Carrega ffmpeg uma única vez
     if (!ffmpeg.isLoaded()) {
       await ffmpeg.load();
     }
 
-    // Limpa FS anterior
     try {
       ffmpeg.FS("unlink", "input.webm");
       ffmpeg.FS("unlink", "output.mp4");
-    } catch (e) {}
+    } catch {}
 
     ffmpeg.FS("writeFile", "input.webm", await fetchFile(webmBlob));
 
@@ -109,6 +125,7 @@ recordBtn.onclick = async () => {
 
   mediaRecorder.start();
 
+  document.body.classList.add("recording");
   recordBtn.disabled = true;
   stopBtn.disabled = false;
 
@@ -129,11 +146,10 @@ stopBtn.onclick = () => {
     mediaRecorder.stop();
   }
 
-  if (scrollTimer) {
-    clearInterval(scrollTimer);
-    scrollTimer = null;
-  }
+  clearInterval(scrollTimer);
+  scrollTimer = null;
 
+  document.body.classList.remove("recording");
   recordBtn.disabled = false;
   stopBtn.disabled = true;
 };
