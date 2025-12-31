@@ -1,60 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Teleprompter Video App</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#000000">
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json">
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
 
-  <!-- ESTILO -->
-  <link rel="stylesheet" href="style.css">
-</head>
-
-<body>
-
-  <div id="stage">
-    <video id="video" autoplay muted playsinline></video>
-
-    <button id="stop" class="stop-btn" disabled>STOP</button>
-
-    <div id="prompter">
-      <div id="text">Paste your script here</div>
-    </div>
-  </div>
-
-  <div id="panel">
-    <textarea id="script" placeholder="Paste your text here"></textarea>
-
-    <div class="controls">
-      <label>
-        Speed
-        <input type="range" id="speed" min="0.5" max="5" step="0.1" value="1.5">
-      </label>
-
-      <input id="filename" placeholder="file-name">
-
-      <button id="record">RECORD</button>
-
-      <a id="download" style="display:none">DOWNLOAD</a>
-    </div>
-  </div>
-
-  <!-- FFMPEG (OBRIGATÓRIO antes do script.js) -->
-  <script src="ffmpeg.min.js"></script>
-
-  <!-- SCRIPT PRINCIPAL -->
-  <script src="script.js"></script>
-
-  <!-- SERVICE WORKER (UMA ÚNICA VEZ) -->
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js");
-    }
-  </script>
-
-</body>
-</html>
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
