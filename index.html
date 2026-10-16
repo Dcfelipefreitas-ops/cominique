@@ -2,22 +2,27 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>ProPrompter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProPrompter AI</title>
     
+    <!-- Este script mata o cache que estava travando o celular -->
     <script>
-      window.addEventListener('error', function(e) {
-        document.body.innerHTML = 
-          '<div style="background:#b91c1c;color:#fff;padding:20px;font-family:sans-serif;font-size:16px;position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;">' +
-          '<h2>⚠️ Erro detectado no Celular:</h2>' +
-          '<p style="background:#000;padding:10px;border-radius:5px;font-family:monospace;">' + e.message + '</p>' +
-          '<p>Arquivo: ' + e.filename + '</p>' +
-          '</div>';
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
       });
     </script>
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body class="bg-slate-950">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Liga o HTML ao seu index.tsx -->
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
