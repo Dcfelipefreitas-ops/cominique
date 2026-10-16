@@ -16,7 +16,6 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onVideoPr
   const [error, setError] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
-  // Iniciar Câmera padrão estável (compatível com Mac, iPhone e Android)
   const startCamera = useCallback(async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -28,7 +27,8 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onVideoPr
         video: {
           facingMode: 'user',
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 }
         },
         audio: true
       });
@@ -59,17 +59,15 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onVideoPr
     if (status === 'recording' && stream) {
       chunksRef.current = [];
 
-      let options: MediaRecorderOptions = {};
+      let mimeType = 'video/webm';
       if (MediaRecorder.isTypeSupported('video/mp4')) {
-        options.mimeType = 'video/mp4';
+        mimeType = 'video/mp4';
       } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
-        options.mimeType = 'video/webm;codecs=vp8,opus';
-      } else if (MediaRecorder.isTypeSupported('video/webm')) {
-        options.mimeType = 'video/webm';
+        mimeType = 'video/webm;codecs=vp8,opus';
       }
 
       try {
-        const recorder = new MediaRecorder(stream, options);
+        const recorder = new MediaRecorder(stream, { mimeType });
 
         recorder.ondataavailable = (e) => {
           if (e.data && e.data.size > 0) {
@@ -78,16 +76,16 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onVideoPr
         };
 
         recorder.onstop = () => {
-          const type = options.mimeType || 'video/mp4';
-          const blob = new Blob(chunksRef.current, { type });
-          
+          const blob = new Blob(chunksRef.current, { type: mimeType });
           if (blob.size > 0) {
             const url = URL.createObjectURL(blob);
             onVideoPronto(blob, url);
+          } else {
+            alert("A gravação foi muito curta. Grave por pelo menos 3 segundos.");
           }
         };
 
-        recorder.start();
+        recorder.start(500); // Coleta dados a cada meio segundo
         mediaRecorderRef.current = recorder;
       } catch (err) {
         console.error("Erro recorder:", err);
@@ -96,6 +94,7 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onVideoPr
     } else if (status === 'stopping' && mediaRecorderRef.current) {
       const rec = mediaRecorderRef.current;
       if (rec.state === 'recording') {
+        rec.requestData();
         rec.stop();
       }
       mediaRecorderRef.current = null;
