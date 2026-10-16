@@ -1,23 +1,56 @@
-
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Play, Square, Download, Video, VideoOff, Type, Maximize2, RotateCcw, Monitor } from 'lucide-react';
+import React, { useState, useCallback, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import { Settings, Play, Square, Video } from 'lucide-react';
 import { PrompterConfig, RecordingStatus } from './types';
 import VideoRecorder from './components/VideoRecorder';
 import Teleprompter from './components/Teleprompter';
 import ControlPanel from './components/ControlPanel';
 
-const App: React.FC = () => {
+// Capturador de Erros: Mostra na tela do celular se algo travar
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.toString() };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Erro capturado:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, backgroundColor: '#7f1d1d', color: '#fff', height: '100vh', zIndex: 9999 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 'bold' }}>⚠️ O aplicativo travou:</h2>
+          <p style={{ marginTop: 10, fontSize: 14 }}>{this.state.error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ marginTop: 20, padding: '10px 20px', background: '#fff', color: '#000', borderRadius: 8 }}
+          >
+            Recarregar Página
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const AppContent: React.FC = () => {
   const [config, setConfig] = useState<PrompterConfig>({
-    script: "Welcome to ProPrompter AI. This is a professional studio environment designed for content creators. Paste your script on the left, adjust the scroll speed and font size, then hit record to start your session. \n\nSmooth scrolling ensures you never lose your place while looking directly into the lens. Good luck with your recording!",
+    script: "Bem-vindo ao Teleprompter!\n\nSe você está lendo isso na tela do seu celular, o aplicativo funcionou com sucesso.\n\nToque em GRAVAR para começar.",
     speed: 2,
-    fontSize: 48,
+    fontSize: 28,
     mirror: false,
     opacity: 0.8,
-    fileName: 'my-video'
+    fileName: 'meu-video'
   });
 
   const [status, setStatus] = useState<RecordingStatus>('idle');
-  const [showSettings, setShowSettings] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const startRecording = useCallback(() => {
@@ -46,9 +79,14 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-950 overflow-hidden">
-      {/* Sidebar Controls */}
-      <aside className={`transition-all duration-300 ease-in-out border-r border-slate-800 bg-slate-900/50 backdrop-blur-xl z-50 ${showSettings ? 'w-full md:w-96' : 'w-0 overflow-hidden md:w-0'}`}>
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-950 overflow-hidden text-white">
+      
+      {/* Menu de Configurações */}
+      <aside 
+        className={`fixed md:relative inset-0 md:inset-auto h-full z-50 transition-all duration-300 ease-in-out border-r border-slate-800 bg-slate-950/95 md:bg-slate-900/50 backdrop-blur-xl ${
+          showSettings ? 'w-full md:w-96 translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 overflow-hidden'
+        }`}
+      >
         <ControlPanel 
           config={config} 
           setConfig={setConfig} 
@@ -57,20 +95,29 @@ const App: React.FC = () => {
         />
       </aside>
 
-      {/* Main Studio Area */}
-      <main className="relative flex-1 flex flex-col items-center justify-center p-4">
-        {/* Header Branding */}
-        <div className="absolute top-6 left-6 flex items-center gap-3 z-40 pointer-events-none">
-          <div className="p-2 bg-blue-600 rounded-lg">
-            <Video className="w-5 h-5 text-white" />
+      {/* Área Central */}
+      <main className="relative flex-1 flex flex-col items-center justify-between p-2 md:p-6 h-full">
+        
+        {/* Barra Superior */}
+        <div className="w-full flex items-center justify-between px-2 py-2 z-40">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-600 rounded-lg">
+              <Video className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-sm md:text-base font-bold text-white">ProPrompter</h1>
           </div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-            ProPrompter AI
-          </h1>
+
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 bg-slate-800 border border-slate-700 rounded-full text-slate-200"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Studio View */}
-        <div className="relative w-full h-full max-w-6xl aspect-video rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black group">
+        {/* Quadro do Vídeo + Texto (Ocupa a maior parte da tela vertical no celular) */}
+        <div className="relative w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 bg-black flex items-center justify-center my-2">
+          
           <VideoRecorder 
             status={status} 
             config={config} 
@@ -82,57 +129,47 @@ const App: React.FC = () => {
             isScrolling={status === 'recording'} 
           />
 
-          {/* Countdown Overlay */}
           {countdown !== null && (
-            <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <span className="text-9xl font-black text-white animate-ping">
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <span className="text-8xl font-black text-white animate-pulse">
                 {countdown}
               </span>
             </div>
           )}
-
-          {/* Minimal Floating Controls */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/50 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {!showSettings && (
-              <button 
-                onClick={() => setShowSettings(true)}
-                className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-300"
-                title="Open Settings"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-            )}
-            
-            <div className="w-px h-6 bg-slate-700 mx-2" />
-
-            {status !== 'recording' ? (
-              <button 
-                onClick={startRecording}
-                disabled={status !== 'idle'}
-                className="flex items-center gap-2 px-6 py-2 bg-red-600 hover:bg-red-500 disabled:bg-slate-700 text-white font-semibold rounded-full transition-all active:scale-95 shadow-lg shadow-red-900/20"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                REC
-              </button>
-            ) : (
-              <button 
-                onClick={stopRecording}
-                className="flex items-center gap-2 px-6 py-2 bg-slate-100 hover:bg-white text-slate-950 font-semibold rounded-full transition-all active:scale-95 shadow-lg"
-              >
-                <Square className="w-4 h-4 fill-current" />
-                STOP
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Footer Info */}
-        <div className="mt-4 flex gap-6 text-slate-500 text-sm">
-          <span className="flex items-center gap-1.5"><Monitor className="w-4 h-4" /> 1080p Studio</span>
-          <span className="flex items-center gap-1.5"><Type className="w-4 h-4" /> Smooth Scroll v2.0</span>
+        {/* Botão Inferior de Gravação */}
+        <div className="w-full py-2 flex items-center justify-center z-40">
+          {status !== 'recording' ? (
+            <button 
+              onClick={startRecording}
+              disabled={status !== 'idle'}
+              className="flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 text-white font-bold rounded-full text-base transition-transform active:scale-95 shadow-lg shadow-red-900/40"
+            >
+              <Play className="w-5 h-5 fill-current" />
+              GRAVAR
+            </button>
+          ) : (
+            <button 
+              onClick={stopRecording}
+              className="flex items-center gap-2 px-8 py-3 bg-white text-slate-950 font-bold rounded-full text-base transition-transform active:scale-95 shadow-lg"
+            >
+              <Square className="w-5 h-5 fill-current" />
+              PARAR
+            </button>
+          )}
         </div>
+
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 };
 
