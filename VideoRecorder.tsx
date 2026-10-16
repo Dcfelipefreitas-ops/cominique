@@ -1,7 +1,6 @@
-
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { RecordingStatus, PrompterConfig } from '../types';
-import { AlertCircle, Download, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Download, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 interface VideoRecorderProps {
   status: RecordingStatus;
@@ -16,22 +15,41 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onFinishe
   const [error, setError] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isSecure, setIsSecure] = useState<boolean>(true);
 
-  // Initialize Camera
+  // Iniciar Câmera de forma Segura (à prova de falhas)
   const startCamera = useCallback(async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1920, height: 1080 },
+      // 1. Verifica se o navegador suporta câmera neste endereço
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setIsSecure(false);
+        setError("O navegador do celular bloqueou a câmera porque o endereço não tem HTTPS (cadeado de segurança).");
+        return;
+      }
+
+      // 2. Tenta abrir a câmera frontal
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: true
-      });
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(console.error);
+        };
       }
       setError(null);
-    } catch (err) {
-      console.error("Camera error:", err);
-      setError("Camera or Microphone access denied. Please enable permissions.");
+    } catch (err: any) {
+      console.error("Erro na câmera:", err);
+      setError("Permissão de câmera negada. Toque em 'Permitir' nas permissões do navegador.");
     }
   }, []);
 
@@ -42,44 +60,49 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onFinishe
     };
   }, [startCamera]);
 
-  // Handle Recording States
+  // Gravação
   useEffect(() => {
     if (status === 'recording' && stream) {
-      setChunks([]);
-      setVideoUrl(null);
-      
-      const options = { mimeType: 'video/webm;codecs=vp9,opus' };
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options.mimeType = 'video/webm;codecs=vp8,opus';
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options.mimeType = 'video/webm';
+      try {
+        setChunks([]);
+        setVideoUrl(null);
+
+        // Escolhe o formato aceito pelo celular
+        let options: MediaRecorderOptions | undefined = undefined;
+        if (typeof MediaRecorder !== 'undefined') {
+          if (MediaRecorder.isTypeSupported('video/mp4')) {
+            options = { mimeType: 'video/mp4' };
+          } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options = { mimeType: 'video/webm' };
+          }
         }
+
+        const recorder = new MediaRecorder(stream, options);
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            setChunks((prev) => [...prev, e.data]);
+          }
+        };
+
+        recorder.start(1000);
+        mediaRecorderRef.current = recorder;
+      } catch (err) {
+        console.error("Erro ao iniciar gravação:", err);
       }
-
-      const recorder = new MediaRecorder(stream, options);
-      
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          setChunks(prev => [...prev, e.data]);
-        }
-      };
-
-      recorder.onstop = () => {
-        // We'll handle the final processing when chunks are ready
-      };
-
-      recorder.start();
-      mediaRecorderRef.current = recorder;
     } else if (status === 'stopping' && mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       mediaRecorderRef.current = null;
     }
   }, [status, stream]);
 
-  // Handle post-recording processing
+  // Finalização do vídeo
   useEffect(() => {
     if (status === 'stopping' && chunks.length > 0) {
-      const blob = new Blob(chunks, { type: 'video/webm' });
+      const type = chunks[0].type || 'video/mp4';
+      const blob = new Blob(chunks, { type });
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
       onFinished();
@@ -90,23 +113,38 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onFinishe
     if (!videoUrl) return;
     const a = document.createElement('a');
     a.href = videoUrl;
-    a.download = `${config.fileName || 'teleprompter'}.webm`;
+    a.download = `${config.fileName || 'gravacao'}.mp4`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     setVideoUrl(null);
   };
 
   return (
-    <div className="relative w-full h-full bg-slate-900 flex items-center justify-center">
+    <div className="relative w-full h-full bg-slate-950 flex items-center justify-center overflow-hidden">
+      
+      {/* Se der erro de permissão ou falta de HTTPS, exibe este aviso em vez de travar */}
       {error ? (
-        <div className="text-center p-8 bg-slate-800 rounded-2xl border border-red-900/50 max-w-sm">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-bold mb-2">Access Denied</h3>
-          <p className="text-slate-400 text-sm mb-6">{error}</p>
+        <div className="text-center p-6 bg-slate-900 border border-slate-800 rounded-2xl max-w-xs m-4 z-30 shadow-xl">
+          {isSecure ? (
+            <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+          ) : (
+            <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          )}
+          
+          <h3 className="text-base font-bold text-white mb-2">
+            {isSecure ? "Acesso à Câmera" : "Conexão Insegura (Sem HTTPS)"}
+          </h3>
+          
+          <p className="text-slate-300 text-xs mb-4 leading-relaxed">
+            {error}
+          </p>
+
           <button 
             onClick={startCamera}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-full text-sm font-semibold transition-colors"
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold"
           >
-            Retry Permission
+            Tentar Conectar Câmera
           </button>
         </div>
       ) : (
@@ -115,33 +153,29 @@ const VideoRecorder: React.FC<VideoRecorderProps> = ({ status, config, onFinishe
           autoPlay
           muted
           playsInline
-          className={`w-full h-full object-cover transition-transform duration-500 ${config.mirror ? 'scale-x-[-1]' : ''}`}
+          webkit-playsinline="true"
+          className={`w-full h-full object-cover ${config.mirror ? 'scale-x-[-1]' : ''}`}
         />
       )}
 
-      {/* Finished Modal */}
+      {/* Janela de Conclusão */}
       {videoUrl && (
-        <div className="absolute inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-6">
-          <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Recording Finished!</h2>
-            <p className="text-slate-400 mb-8">Your video is ready to be downloaded.</p>
-            
-            <div className="space-y-3">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xs w-full text-center">
+            <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
+            <h2 className="text-lg font-bold text-white mb-1">Vídeo Gravado!</h2>
+            <div className="space-y-2 mt-4">
               <button 
                 onClick={handleDownload}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-blue-900/20"
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs"
               >
-                <Download className="w-5 h-5" />
-                Download Recording
+                <Download className="w-4 h-4" /> Baixar Vídeo
               </button>
               <button 
                 onClick={() => setVideoUrl(null)}
-                className="w-full py-3 px-6 text-slate-400 hover:text-white transition-colors"
+                className="w-full py-2 text-slate-400 text-xs"
               >
-                Dismiss
+                Fechar
               </button>
             </div>
           </div>
