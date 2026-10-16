@@ -1,28 +1,136 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ProPrompter AI</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ProPrompter AI</title>
+  
+  <!-- Tailwind CSS para o visual moderno -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Ícones -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-slate-950 text-white h-screen w-screen overflow-hidden flex flex-col justify-between p-3 select-none">
+
+  <!-- BARRA SUPERIOR -->
+  <header class="flex items-center justify-between w-full max-w-4xl mx-auto py-2 z-30">
+    <div class="flex items-center gap-2">
+      <div class="p-2 bg-blue-600 rounded-lg">
+        <i data-lucide="video" class="w-4 h-4 text-white"></i>
+      </div>
+      <h1 class="text-base font-bold text-slate-100">ProPrompter</h1>
+    </div>
+
+    <button id="btnSettings" class="p-2.5 bg-slate-800/80 border border-slate-700 rounded-full text-slate-200 active:scale-95 transition">
+      <i data-lucide="settings" class="w-5 h-5"></i>
+    </button>
+  </header>
+
+  <!-- ÁREA DA CÂMERA E TELEPROMPTER -->
+  <main class="relative flex-1 w-full max-w-4xl mx-auto rounded-2xl overflow-hidden border border-slate-800 bg-black flex items-center justify-center shadow-2xl">
     
-    <!-- Este script mata o cache que estava travando o celular -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (let registration of registrations) {
-            registration.unregister();
-          }
-        });
-      }
-      caches.keys().then(function(names) {
-        for (let name of names) caches.delete(name);
-      });
-    </script>
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body class="bg-slate-950">
-    <div id="root"></div>
-    <!-- Liga o HTML ao seu index.tsx -->
-    <script type="module" src="./index.tsx"></script>
-  </body>
+    <!-- CÂMERA -->
+    <video id="cameraFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+
+    <!-- AVISO CASO NÃO TENHA CÂMERA -->
+    <div id="cameraError" class="hidden absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900 z-20">
+      <i data-lucide="alert-circle" class="w-12 h-12 text-yellow-500 mb-3"></i>
+      <h2 class="text-lg font-bold mb-1">Acesso à Câmera</h2>
+      <p class="text-slate-400 text-xs mb-4 max-w-xs">Permita o acesso à câmera para se ver enquanto lê.</p>
+      <button id="btnRetryCamera" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold">Ativar Câmera</button>
+    </div>
+
+    <!-- TEXTO DO TELEPROMPTER -->
+    <div id="prompterOverlay" class="absolute inset-0 z-10 pointer-events-none flex flex-col items-center overflow-hidden">
+      <!-- Máscara de gradiente para suavizar -->
+      <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/60 pointer-events-none"></div>
+      
+      <!-- Conteúdo do Texto -->
+      <div id="prompterText" class="w-11/12 max-w-2xl text-center font-bold text-white leading-relaxed drop-shadow-md py-40 transition-transform">
+        Bem-vindo ao Teleprompter!
+        <br><br>
+        Cole seu roteiro nas configurações para começar.
+        <br><br>
+        O texto vai rolar suavemente na velocidade que você escolher.
+      </div>
+    </div>
+
+    <!-- CONTAGEM REGRESSIVA (3, 2, 1) -->
+    <div id="countdownOverlay" class="hidden absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+      <span id="countdownNumber" class="text-9xl font-black text-white animate-pulse">3</span>
+    </div>
+  </main>
+
+  <!-- BARRA INFERIOR (BOTÃO GRAVAR) -->
+  <footer class="w-full max-w-4xl mx-auto py-3 flex items-center justify-center z-30">
+    <button id="btnRecord" class="flex items-center gap-2 px-8 py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full text-base shadow-lg shadow-red-900/40 active:scale-95 transition-all">
+      <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+      <span>GRAVAR</span>
+    </button>
+  </footer>
+
+  <!-- MODAL DE CONFIGURAÇÕES -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-md h-full bg-slate-900 border-l border-slate-800 p-6 overflow-y-auto flex flex-col justify-between">
+      <div class="space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <h2 class="text-lg font-bold">Configurações</h2>
+          <button id="btnCloseSettings" class="text-slate-400 hover:text-white p-2">✕</button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-2">SEU ROTEIRO</label>
+          <textarea id="scriptInput" rows="7" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500"></textarea>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <div class="flex justify-between text-xs font-semibold text-slate-400 mb-1">
+              <span>VELOCIDADE</span>
+              <span id="speedVal">2x</span>
+            </div>
+            <input id="speedRange" type="range" min="1" max="6" step="1" value="2" class="w-full accent-blue-600" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs font-semibold text-slate-400 mb-1">
+              <span>TAMANHO DO TEXTO</span>
+              <span id="fontVal">28px</span>
+            </div>
+            <input id="fontRange" type="range" min="18" max="60" step="2" value="28" class="w-full accent-blue-600" />
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <span class="text-xs font-semibold text-slate-400">ESPELHAR CÂMERA</span>
+            <input id="mirrorToggle" type="checkbox" class="w-5 h-5 accent-blue-600 rounded" checked />
+          </div>
+        </div>
+      </div>
+
+      <button id="btnSaveSettings" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition">
+        Salvar e Fechar
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE DOWNLOAD -->
+  <div id="downloadModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-xs w-full text-center">
+      <i data-lucide="check-circle" class="w-12 h-12 text-green-500 mx-auto mb-3"></i>
+      <h3 class="text-lg font-bold mb-1">Vídeo Gravado!</h3>
+      <p class="text-slate-400 text-xs mb-5">Seu vídeo está pronto para ser salvo.</p>
+      <div class="space-y-2">
+        <a id="btnDownload" download="gravacao.mp4" class="block w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs cursor-pointer">
+          Baixar Vídeo
+        </a>
+        <button id="btnCloseDownload" class="w-full py-2 text-slate-400 hover:text-white text-xs">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
 </html>
