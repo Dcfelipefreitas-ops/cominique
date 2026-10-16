@@ -1,155 +1,200 @@
-// ===============================
-// ELEMENTOS
-// ===============================
-const video = document.getElementById("video");
-const text = document.getElementById("text");
-const scriptInput = document.getElementById("script");
-const speed = document.getElementById("speed");
-const recordBtn = document.getElementById("record");
-const stopBtn = document.getElementById("stop");
-const download = document.getElementById("download");
-const filename = document.getElementById("filename");
+// Elementos da Interface
+const cameraFeed = document.getElementById('cameraFeed');
+const cameraError = document.getElementById('cameraError');
+const btnRetryCamera = document.getElementById('btnRetryCamera');
 
-// ===============================
-// FFMPEG
-// ===============================
-const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ log: true });
+const prompterText = document.getElementById('prompterText');
+const btnRecord = document.getElementById('btnRecord');
 
-// ===============================
-// ESTADO
-// ===============================
-let mediaRecorder = null;
-let chunks = [];
-let scrollY = 100;
-let scrollTimer = null;
+const countdownOverlay = document.getElementById('countdownOverlay');
+const countdownNumber = document.getElementById('countdownNumber');
+
+const settingsModal = document.getElementById('settingsModal');
+const btnSettings = document.getElementById('btnSettings');
+const btnCloseSettings = document.getElementById('btnCloseSettings');
+const btnSaveSettings = document.getElementById('btnSaveSettings');
+
+const scriptInput = document.getElementById('scriptInput');
+const speedRange = document.getElementById('speedRange');
+const speedVal = document.getElementById('speedVal');
+const fontRange = document.getElementById('fontRange');
+const fontVal = document.getElementById('fontVal');
+const mirrorToggle = document.getElementById('mirrorToggle');
+
+const downloadModal = document.getElementById('downloadModal');
+const btnDownload = document.getElementById('btnDownload');
+const btnCloseDownload = document.getElementById('btnCloseDownload');
+
+// Estados
 let stream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let scrollInterval = null;
+let scrollY = 0;
 
-// ===============================
-// TEXTO AO VIVO
-// ===============================
-scriptInput.oninput = () => {
-  text.innerText = scriptInput.value || "Paste your script here";
-  scrollY = 100;
-  text.style.top = "100%";
-};
+let speed = 2;
+let fontSize = 28;
+let mirror = true;
 
-// ===============================
-// INICIAR CÂMERA
-// ===============================
-async function startCamera() {
-  if (stream) return stream;
-
+// 1. INICIALIZAR CÂMERA
+async function initCamera() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
+    const constraints = {
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
       audio: true
-    });
-
-    video.srcObject = stream;
-    video.muted = true;
-    await video.play();
-
-    return stream;
+    };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    cameraFeed.srcObject = stream;
+    cameraError.classList.add('hidden');
   } catch (err) {
-    alert("Erro ao acessar câmera/microfone");
-    console.error(err);
+    console.error("Erro câmera:", err);
+    cameraError.classList.remove('hidden');
   }
 }
 
-// ===============================
-// GRAVAR
-// ===============================
-recordBtn.onclick = async () => {
-  await startCamera();
-  if (!stream) return;
+btnRetryCamera.addEventListener('click', initCamera);
 
-  chunks = [];
+// 2. CONFIGURAÇÕES
+scriptInput.value = prompterText.innerText;
 
-  // ✅ MIME TYPE COMPATÍVEL
-  let options = {};
-  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) {
-    options.mimeType = "video/webm;codecs=vp8,opus";
-  } else if (MediaRecorder.isTypeSupported("video/webm")) {
-    options.mimeType = "video/webm";
+btnSettings.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+btnCloseSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+speedRange.addEventListener('input', (e) => {
+  speed = Number(e.target.value);
+  speedVal.innerText = `${speed}x`;
+});
+
+fontRange.addEventListener('input', (e) => {
+  fontSize = Number(e.target.value);
+  fontVal.innerText = `${fontSize}px`;
+  prompterText.style.fontSize = `${fontSize}px`;
+});
+
+mirrorToggle.addEventListener('change', (e) => {
+  mirror = e.target.checked;
+  cameraFeed.style.transform = mirror ? 'scaleX(-1)' : 'none';
+});
+
+btnSaveSettings.addEventListener('click', () => {
+  prompterText.innerText = scriptInput.value;
+  settingsModal.classList.add('hidden');
+});
+
+// 3. ROLAGEM DO TELEPROMPTER
+function startScrolling() {
+  scrollY = 0;
+  prompterText.style.transform = `translateY(0px)`;
+  clearInterval(scrollInterval);
+
+  scrollInterval = setInterval(() => {
+    scrollY -= (speed * 0.7);
+    prompterText.style.transform = `translateY(${scrollY}px)`;
+  }, 16);
+}
+
+function stopScrolling() {
+  clearInterval(scrollInterval);
+  scrollY = 0;
+  prompterText.style.transform = `translateY(0px)`;
+}
+
+// 4. GRAVAÇÃO
+function startRecordingProcess() {
+  let count = 3;
+  countdownOverlay.classList.remove('hidden');
+  countdownNumber.innerText = count;
+
+  const countTimer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      countdownNumber.innerText = count;
+    } else {
+      clearInterval(countTimer);
+      countdownOverlay.classList.add('hidden');
+      beginMediaRecorder();
+    }
+  }, 1000);
+}
+
+function beginMediaRecorder() {
+  recordedChunks = [];
+  
+  let options = undefined;
+  if (typeof MediaRecorder !== 'undefined') {
+    if (MediaRecorder.isTypeSupported('video/mp4')) {
+      options = { mimeType: 'video/mp4' };
+    } else if (MediaRecorder.isTypeSupported('video/webm')) {
+      options = { mimeType: 'video/webm' };
+    }
   }
 
   try {
     mediaRecorder = new MediaRecorder(stream, options);
   } catch (e) {
-    alert("MediaRecorder não suportado neste navegador");
-    console.error(e);
-    return;
+    mediaRecorder = new MediaRecorder(stream);
   }
 
-  mediaRecorder.ondataavailable = e => {
+  mediaRecorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) {
-      chunks.push(e.data);
+      recordedChunks.push(e.data);
     }
   };
 
-  mediaRecorder.onstop = async () => {
-    const webmBlob = new Blob(chunks, { type: "video/webm" });
-
-    download.style.display = "block";
-    download.innerText = "⏳ Convertendo para MP4...";
-    download.removeAttribute("download");
-
-    if (!ffmpeg.isLoaded()) {
-      await ffmpeg.load();
-    }
-
-    try {
-      ffmpeg.FS("unlink", "input.webm");
-      ffmpeg.FS("unlink", "output.mp4");
-    } catch {}
-
-    ffmpeg.FS("writeFile", "input.webm", await fetchFile(webmBlob));
-
-    await ffmpeg.run(
-      "-i", "input.webm",
-      "-movflags", "faststart",
-      "-pix_fmt", "yuv420p",
-      "output.mp4"
-    );
-
-    const mp4Data = ffmpeg.FS("readFile", "output.mp4");
-    const mp4Blob = new Blob([mp4Data.buffer], { type: "video/mp4" });
-
-    const mp4URL = URL.createObjectURL(mp4Blob);
-
-    download.href = mp4URL;
-    download.download = (filename.value || "teleprompter") + ".mp4";
-    download.innerText = "⬇️ Baixar MP4";
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/mp4' });
+    const url = URL.createObjectURL(blob);
+    btnDownload.href = url;
+    downloadModal.classList.remove('hidden');
   };
 
-  mediaRecorder.start();
+  mediaRecorder.start(1000);
+  isRecording = true;
 
-  document.body.classList.add("recording");
-  recordBtn.disabled = true;
-  stopBtn.disabled = false;
+  // Atualiza botão para PARAR
+  btnRecord.classList.remove('bg-red-600', 'hover:bg-red-500');
+  btnRecord.classList.add('bg-white', 'text-slate-950');
+  btnRecord.innerHTML = `<i data-lucide="square" class="w-5 h-5 fill-current"></i><span>PARAR</span>`;
+  lucide.createIcons();
 
-  // ===============================
-  // SCROLL DO PROMPTER
-  // ===============================
-  scrollTimer = setInterval(() => {
-    scrollY -= Number(speed.value || 1) * 0.1;
-    text.style.top = scrollY + "%";
-  }, 30);
-};
+  startScrolling();
+}
 
-// ===============================
-// PARAR
-// ===============================
-stopBtn.onclick = () => {
-  if (mediaRecorder && mediaRecorder.state === "recording") {
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
   }
+  isRecording = false;
 
-  clearInterval(scrollTimer);
-  scrollTimer = null;
+  btnRecord.classList.remove('bg-white', 'text-slate-950');
+  btnRecord.classList.add('bg-red-600', 'hover:bg-red-500');
+  btnRecord.innerHTML = `<i data-lucide="play" class="w-5 h-5 fill-current"></i><span>GRAVAR</span>`;
+  lucide.createIcons();
 
-  document.body.classList.remove("recording");
-  recordBtn.disabled = false;
-  stopBtn.disabled = true;
-};
+  stopScrolling();
+}
+
+btnRecord.addEventListener('click', () => {
+  if (!isRecording) {
+    startRecordingProcess();
+  } else {
+    stopRecording();
+  }
+});
+
+btnCloseDownload.addEventListener('click', () => {
+  downloadModal.classList.add('hidden');
+});
+
+// Inicialização
+window.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  prompterText.style.fontSize = `${fontSize}px`;
+  cameraFeed.style.transform = mirror ? 'scaleX(-1)' : 'none';
+  initCamera();
+});
