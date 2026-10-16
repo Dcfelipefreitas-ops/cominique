@@ -1,47 +1,13 @@
-import React, { useState, useCallback, useEffect, Component, ErrorInfo, ReactNode } from 'react';
-import { Settings, Play, Square, Video } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Settings, Play, Square, Video, Download } from 'lucide-react';
 import { PrompterConfig, RecordingStatus } from './types';
-import VideoRecorder from './components/VideoRecorder';
-import Teleprompter from './components/Teleprompter';
-import ControlPanel from './components/ControlPanel';
+import VideoRecorder from './VideoRecorder';
+import Teleprompter from './Teleprompter';
+import ControlPanel from './ControlPanel';
 
-// Capturador de Erros: Mostra na tela do celular se algo travar
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: '' };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error: error.toString() };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Erro capturado:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 20, backgroundColor: '#7f1d1d', color: '#fff', height: '100vh', zIndex: 9999 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 'bold' }}>⚠️ O aplicativo travou:</h2>
-          <p style={{ marginTop: 10, fontSize: 14 }}>{this.state.error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{ marginTop: 20, padding: '10px 20px', background: '#fff', color: '#000', borderRadius: 8 }}
-          >
-            Recarregar Página
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-const AppContent: React.FC = () => {
+const App: React.FC = () => {
   const [config, setConfig] = useState<PrompterConfig>({
-    script: "Bem-vindo ao Teleprompter!\n\nSe você está lendo isso na tela do seu celular, o aplicativo funcionou com sucesso.\n\nToque em GRAVAR para começar.",
+    script: "Bem-vindo ao Teleprompter!\n\nToque no botão vermelho para gravar e no branco para parar.\n\nDepois clique no botão azul ao lado para salvar.",
     speed: 2,
     fontSize: 28,
     mirror: false,
@@ -52,8 +18,10 @@ const AppContent: React.FC = () => {
   const [status, setStatus] = useState<RecordingStatus>('idle');
   const [showSettings, setShowSettings] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [videoSalvo, setVideoSalvo] = useState<{ blob: Blob; url: string } | null>(null);
 
   const startRecording = useCallback(() => {
+    setVideoSalvo(null);
     let count = 3;
     setCountdown(count);
     setStatus('starting');
@@ -74,17 +42,47 @@ const AppContent: React.FC = () => {
     setStatus('stopping');
   }, []);
 
-  const handleRecordingFinished = useCallback(() => {
+  const handleVideoPronto = useCallback((blob: Blob, url: string) => {
     setStatus('idle');
+    setVideoSalvo({ blob, url });
   }, []);
 
+  // Salvar no celular ou baixar no Mac
+  const handleSalvar = async () => {
+    if (!videoSalvo) return;
+
+    const nomeArquivo = `video_${Date.now()}.mp4`;
+    const file = new File([videoSalvo.blob], nomeArquivo, { type: 'video/mp4' });
+
+    // Se estiver no celular, abre para salvar na galeria
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Meu Vídeo'
+        });
+        return;
+      } catch (err) {
+        console.log("Compartilhamento cancelado");
+      }
+    }
+
+    // Se estiver no Mac ou navegador comum, faz download direto
+    const a = document.createElement('a');
+    a.href = videoSalvo.url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-950 overflow-hidden text-white">
+    <div className="flex flex-col h-screen w-full bg-slate-950 overflow-hidden text-white">
       
-      {/* Menu de Configurações */}
+      {/* Menu Lateral de Configurações */}
       <aside 
-        className={`fixed md:relative inset-0 md:inset-auto h-full z-50 transition-all duration-300 ease-in-out border-r border-slate-800 bg-slate-950/95 md:bg-slate-900/50 backdrop-blur-xl ${
-          showSettings ? 'w-full md:w-96 translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 overflow-hidden'
+        className={`fixed inset-0 h-full z-50 transition-all duration-300 border-r border-slate-800 bg-slate-950 ${
+          showSettings ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <ControlPanel 
@@ -95,33 +93,33 @@ const AppContent: React.FC = () => {
         />
       </aside>
 
-      {/* Área Central */}
-      <main className="relative flex-1 flex flex-col items-center justify-between p-2 md:p-6 h-full">
-        
-        {/* Barra Superior */}
-        <div className="w-full flex items-center justify-between px-2 py-2 z-40">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-600 rounded-lg">
-              <Video className="w-4 h-4 text-white" />
-            </div>
-            <h1 className="text-sm md:text-base font-bold text-white">ProPrompter</h1>
+      {/* Topo */}
+      <header className="w-full flex items-center justify-between p-3 z-20 border-b border-slate-900">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-blue-600 rounded-lg">
+            <Video className="w-4 h-4 text-white" />
           </div>
-
-          <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 bg-slate-800 border border-slate-700 rounded-full text-slate-200"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <span className="font-bold text-sm">ProPrompter</span>
         </div>
 
-        {/* Quadro do Vídeo + Texto (Ocupa a maior parte da tela vertical no celular) */}
-        <div className="relative w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 bg-black flex items-center justify-center my-2">
+        {status !== 'recording' && (
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="p-2 bg-slate-800 border border-slate-700 rounded-full text-slate-200"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        )}
+      </header>
+
+      {/* Meio: Câmera com Teleprompter */}
+      <main className="relative flex-1 w-full p-2 flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-black flex items-center justify-center">
           
           <VideoRecorder 
             status={status} 
             config={config} 
-            onFinished={handleRecordingFinished}
+            onVideoPronto={handleVideoPronto}
           />
           
           <Teleprompter 
@@ -130,46 +128,53 @@ const AppContent: React.FC = () => {
           />
 
           {countdown !== null && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-              <span className="text-8xl font-black text-white animate-pulse">
-                {countdown}
-              </span>
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <span className="text-8xl font-black text-white">{countdown}</span>
             </div>
           )}
         </div>
-
-        {/* Botão Inferior de Gravação */}
-        <div className="w-full py-2 flex items-center justify-center z-40">
-          {status !== 'recording' ? (
-            <button 
-              onClick={startRecording}
-              disabled={status !== 'idle'}
-              className="flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 text-white font-bold rounded-full text-base transition-transform active:scale-95 shadow-lg shadow-red-900/40"
-            >
-              <Play className="w-5 h-5 fill-current" />
-              GRAVAR
-            </button>
-          ) : (
-            <button 
-              onClick={stopRecording}
-              className="flex items-center gap-2 px-8 py-3 bg-white text-slate-950 font-bold rounded-full text-base transition-transform active:scale-95 shadow-lg"
-            >
-              <Square className="w-5 h-5 fill-current" />
-              PARAR
-            </button>
-          )}
-        </div>
-
       </main>
-    </div>
-  );
-};
 
-const App: React.FC = () => {
-  return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
+      {/* RODAPÉ COM OS BOTÕES LADO A LADO */}
+      <footer className="w-full p-4 flex items-center justify-center gap-4 z-30 bg-slate-950 border-t border-slate-900">
+        
+        {/* BOTÃO 1: GRAVAR OU PARAR */}
+        {status === 'recording' ? (
+          <button 
+            onClick={stopRecording}
+            className="flex-1 max-w-[180px] flex items-center justify-center gap-2 py-3.5 bg-white text-slate-950 font-bold rounded-xl text-sm shadow-xl active:scale-95 transition-all"
+          >
+            <Square className="w-4 h-4 fill-current text-red-600" />
+            PARAR
+          </button>
+        ) : (
+          <button 
+            onClick={startRecording}
+            disabled={status !== 'idle'}
+            className="flex-1 max-w-[180px] flex items-center justify-center gap-2 py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-red-900/40 active:scale-95 transition-all"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            GRAVAR
+          </button>
+        )}
+
+        {/* BOTÃO 2: SALVAR (FICA AO LADO DO BOTÃO DE GRAVAR) */}
+        <button 
+          onClick={handleSalvar}
+          disabled={!videoSalvo || status === 'recording'}
+          className={`flex-1 max-w-[180px] flex items-center justify-center gap-2 py-3.5 font-bold rounded-xl text-sm transition-all ${
+            videoSalvo && status !== 'recording'
+              ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40 active:scale-95'
+              : 'bg-slate-800/50 text-slate-500 border border-slate-800 cursor-not-allowed'
+          }`}
+        >
+          <Download className="w-4 h-4" />
+          {videoSalvo ? 'SALVAR VÍDEO' : 'SEM VÍDEO'}
+        </button>
+
+      </footer>
+
+    </div>
   );
 };
 
